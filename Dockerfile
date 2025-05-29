@@ -7,9 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# If you have any environment variables, set them here
-# ENV DATABASE_URL=your_database_url
+EXPOSE 5000
 
-EXPOSE 8080
-
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+CMD ["python", "app3.py"]
