@@ -2,33 +2,16 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = 'dashboard-app'
-        DOCKER_TAG = 'latest'
-        CONTAINER_NAME = 'dashboard-container'
-        APP_PORT = '5003'
+        DOCKER_IMAGE = 'flask-dashboard-app'
+        DOCKER_TAG = "${BUILD_NUMBER}"
+        // Add any environment variables your app needs
+        // DATABASE_URL = credentials('database-url-credential-id')
     }
     
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
-        
-        stage('Install Dependencies') {
-            steps {
-                sh '''
-                    python -m pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
-            }
-        }
-        
-        stage('Run Tests') {
-            steps {
-                sh '''
-                    python -m pytest tests/ || true
-                '''
             }
         }
         
@@ -40,26 +23,20 @@ pipeline {
             }
         }
         
+        stage('Test') {
+            steps {
+                sh 'python -m pytest tests/'
+            }
+        }
+        
         stage('Deploy') {
             steps {
                 script {
-                    // Stop and remove existing container if it exists
-                    sh '''
-                        docker stop ${CONTAINER_NAME} || true
-                        docker rm ${CONTAINER_NAME} || true
-                    '''
+                    // Stop existing container if running
+                    sh 'docker ps -q --filter "name=flask-dashboard" | grep -q . && docker stop flask-dashboard && docker rm flask-dashboard || echo "No container running"'
                     
                     // Run new container
-                    sh '''
-                        docker run -d \
-                            --name ${CONTAINER_NAME} \
-                            --network jenkins-network \
-                            -p ${APP_PORT}:5003 \
-                            -e AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID} \
-                            -e AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET} \
-                            -e AUTH0_DOMAIN=${AUTH0_DOMAIN} \
-                            ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    '''
+                    sh "docker run -d --name flask-dashboard -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
                 }
             }
         }
@@ -67,10 +44,7 @@ pipeline {
     
     post {
         failure {
-            echo 'Pipeline failed! Check the logs for details.'
-        }
-        success {
-            echo 'Pipeline succeeded! Application deployed successfully.'
+            echo 'Pipeline failed!'
         }
     }
 }
