@@ -13,23 +13,16 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh 'python -m pip install --upgrade pip'
-                sh 'pip install -r requirements.txt'
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                sh 'python -m pytest tests/'
-            }
-        }
-
-        stage('Build Docker Image') {
+        stage('Build and Test') {
             steps {
                 script {
+                    // Build the Docker image
                     docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+
+                    // Run tests inside a container
+                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
+                        sh 'python -m pytest tests/'
+                    }
                 }
             }
         }
@@ -60,6 +53,10 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed! Check the logs for details.'
+        }
+        always {
+            // Clean up old images
+            sh 'docker image prune -f'
         }
     }
 }
