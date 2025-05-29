@@ -11,6 +11,13 @@ pipeline {
     }
 
     stages {
+        stage('Cleanup Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+    stages {
         stage('Prepare') {
             steps {
                 sh 'chmod -R 777 .'
