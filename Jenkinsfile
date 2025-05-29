@@ -1,12 +1,23 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        ansiColor('xterm')
+    }
+    
     environment {
         DOCKER_IMAGE = 'flask-dashboard'
         DOCKER_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
+        stage('Prepare') {
+            steps {
+                sh 'chmod -R 777 .'
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -16,12 +27,19 @@ pipeline {
         stage('Build and Test') {
             steps {
                 script {
-                    // Build the Docker image
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    try {
+                        // Build Docker image
+                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
 
-                    // Run tests inside a container
-                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
-                        sh 'python -m pytest tests/'
+                        // Run tests inside a container
+                        sh """
+                            docker run --rm \
+                                -v \$(pwd)/tests:/app/tests \
+                                ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                python3 -m pytest tests/
+                        """
+                    } catch (Exception e) {
+                        error "Build or test failed: ${e.getMessage()}"
                     }
                 }
             }
@@ -30,18 +48,36 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    // Stop existing container if running
-                    sh '''
-                        docker ps -q --filter "name=${DOCKER_IMAGE}" | grep -q . && docker stop ${DOCKER_IMAGE} && docker rm ${DOCKER_IMAGE} || echo "No container running"
-                    '''
-                    
-                    // Run new container
-                    sh """
-                        docker run -d \
-                            --name ${DOCKER_IMAGE} \
-                            -p 5000:5000 \
-                            ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    """
+                    try {
+                        // Stop existing container if running
+                        sh '''
+                            container_id=$(docker ps -q --filter "name=${DOCKER_IMAGE}")
+                            if [ ! -z "$container_id" ]; then
+                                docker stop $container_id
+                                docker rm $container_id
+                            fi
+                        '''
+                        
+                        // Run new container
+                        sh """
+                            docker run -d \
+                                --name ${DOCKER_IMAGE} \
+                                -p 5000:5000 \
+                                --restart unless-stopped \
+                                ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        """
+
+                        // Verify container is running
+                        sh '''
+                            sleep 5
+                            if ! docker ps | grep -q ${DOCKER_IMAGE}; then
+                                echo "Container failed to start"
+                                exit 1
+                            fi
+                        '''
+                    } catch (Exception e) {
+                        error "Deployment failed: ${e.getMessage()}"
+                    }
                 }
             }
         }
@@ -53,10 +89,26 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed! Check the logs for details.'
+            script {
+                // Cleanup on failure
+                sh '''
+                    container_id=$(docker ps -q --filter "name=${DOCKER_IMAGE}")
+                    if [ ! -z "$container_id" ]; then
+                        docker stop $container_id
+                        docker rm $container_id
+                    fi
+                '''
+            }
         }
         always {
-            // Clean up old images
-            sh 'docker image prune -f'
+            script {
+                try {
+                    // Clean up old images
+                    sh 'docker image prune -f'
+                } catch (Exception e) {
+                    echo "Warning: Image cleanup failed: ${e.getMessage()}"
+                }
+            }
         }
     }
 }
