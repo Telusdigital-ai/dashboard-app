@@ -12,8 +12,7 @@ pipeline {
                 checkout([$class: 'GitSCM', 
                     branches: [[name: 'refs/heads/main']], // Explicitly specify main branch
                     userRemoteConfigs: [[
-                        url: 'https://github.com/Telusdigital-ai/dashboard-app',
-                        
+                        url: 'https://github.com/Telusdigital-ai/dashboard-app'
                     ]]
                 ])
             }
