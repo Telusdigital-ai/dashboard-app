@@ -58,7 +58,7 @@ auth0 = oauth.register(
     authorize_url=f'https://{AUTH0_DOMAIN}/authorize',
     client_kwargs={
         'scope': 'openid profile email',
-        'audience': f'https://{AUTH0_DOMAIN}/userinfo'
+        'response_type': 'code'
     },
     server_metadata_url=f'https://{AUTH0_DOMAIN}/.well-known/openid-configuration'
 )
