@@ -120,14 +120,13 @@ def login():
             return redirect(url_for('dashboard'))
             
         logger.info("Initiating Auth0 login flow")
-        return auth0.authorize_redirect(
-            redirect_uri=url_for('callback', _external=True, _scheme='http')  # Changed to http
-        )
+        callback_url = url_for('callback', _external=True, _scheme='http')
+        logger.info(f"Callback URL: {callback_url}")  # Add this for debugging
+        return auth0.authorize_redirect(redirect_uri=callback_url)
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         session.clear()
         return render_template('error.html', error="Login system temporarily unavailable"), 500
-
 
 @app.route("/callback")
 def callback():
