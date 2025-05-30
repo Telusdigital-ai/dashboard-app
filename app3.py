@@ -116,14 +116,12 @@ def requires_auth(f):
 @app.route("/login")
 def login():
     try:
-        # Check if user is already authenticated
         if 'user' in session and session['user'].get('user_id'):
-            logger.info("User already authenticated, redirecting to dashboard")
             return redirect(url_for('dashboard'))
             
         logger.info("Initiating Auth0 login flow")
         return auth0.authorize_redirect(
-            redirect_uri=url_for('callback', _external=True, _scheme='https')
+            redirect_uri=url_for('callback', _external=True, _scheme='http')  # Changed to http
         )
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
